@@ -1,0 +1,57 @@
+name: .NET Core Desktop
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: ${{ github.event_name == 'workflow_dispatch' && fromJson(format('["{0}"]', inputs.configuration)) || fromJson('["Debug", "Release"]') }}
+    runs-on: windows-latest
+
+    env:
+      Solution_Name: WinDurango
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Restore the application
+      run: dotnet restore
+
+    - name: Publish
+      run: |
+        dotnet publish --configuration $env:Configuration --output ./$env:Configuration -r win-x64 /p:Platform=x64
+        copy D:/a/WinDurango.UI/WinDurango.UI/Assets/contributors.txt ./$env:Configuration/Assets/contributors.txt
+      env:
+        Configuration: ${{ matrix.configuration }}
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: WinDurangoUI-${{ matrix.configuration }}
+        path: ./${{ matrix.configuration }}
